@@ -5,6 +5,7 @@
   Описание:
   - PINCH1 - канал ГАЗА
   - PINCH2 - канал ТУМБЛЕРА
+  - PINCH3 - канал ТУМБЛЕРА ГИРЛЯНДЫ
 
   Возможности: 
   - Проверка сигнала ТОЛЬКО при включении (если сигнала нет - горит АВАРИЙНАЯ СИГНАЛИЗАЦИЯ)
@@ -22,32 +23,39 @@
 // Входные пины
 #define PINCH1 4 // Пин канала ГАЗА
 #define PINCH2 5 // Пин канала ТУМБЛЕРА
+#define PINCH3 6 // Пин канала ТУМБЛЕРА ГИРЛЯНДЫ
 // Выходные пины
-#define REVERS_LIGHT 10 // Пин ЗАДНЕГО ХОДА
-#define STOP_LIGHT 14   // Пин СТОП СИГНАЛА
-#define REAR_LIGHT 18   // Пин ГАБАРИТОВ
-#define FRONT_LIGHT 20  // Пин СВЕТА
+#define REVERS_LIGHT 15  // Пин ЗАДНЕГО ХОДА
+#define STOP_LIGHT 16    // Пин СТОП СИГНАЛА
+#define LEFT_LIGHT 20    // Пин ЛЕВЫХ ГАБАРИТОВ
+#define RIGHT_LIGHT 18   // Пин ПРАВЫХ ГАБАРИТОВ
+#define FRONT_LIGHT 14   // Пин СВЕТА
+#define FRONT_GARLAND 10 // Пин ГИРЛЯНДА
 // ----------------------- ПИНЫ ---------------------------
 
 // --------------------- ПЕРЕМЕННЫЕ ----------------------
-int ppm_throttle, ppm_switch;
+int ppm_throttle, ppm_switch_light, ppm_switch_garland;
 int throttle_min;          // Нижняя граница нейтрали газа,
 int throttle_max;          // Верхняя граница нейтрали газа
-int switch_min;            // Нижняя граница тумблера
-int switch_max;            // Верхняя граница тумблера
+int switch_light_min;      // Нижняя граница тумблера
+int switch_light_max;      // Верхняя граница тумблера
+int switch_garland_min;    // Нижняя граница тумблера гирлянды
+int switch_garland_max;    // Верхняя граница тумблера гирлянды
 bool calibration_flag = 0; // Флаг калибровки
 // --------------------- ПЕРЕМЕННЫЕ ----------------------
 
 // --------------------- ИНИЦИАЛИЗАЦИЯ ----------------------
 void setup()
 {
-  Serial.begin(9600);
-  pinMode(PINCH1, INPUT);        // Вход канала ГАЗА
-  pinMode(PINCH2, INPUT);        // Вход канала ТУМБЛЕРА
-  pinMode(STOP_LIGHT, OUTPUT);   // Выход для ламп СТОП СИГНАЛА
-  pinMode(REVERS_LIGHT, OUTPUT); // Выход для ламп ЗАДНЕГО ХОДА
-  pinMode(FRONT_LIGHT, OUTPUT);  // Выход для лам переднего СВЕТА
-  pinMode(REAR_LIGHT, OUTPUT);   // Выход для лам ГАБАРИТОВ
+  //Serial.begin(9600);
+  pinMode(PINCH1, INPUT);         // Вход канала ГАЗА
+  pinMode(PINCH2, INPUT);         // Вход канала ТУМБЛЕРА
+  pinMode(STOP_LIGHT, OUTPUT);    // Выход для ламп СТОП СИГНАЛА
+  pinMode(REVERS_LIGHT, OUTPUT);  // Выход для ламп ЗАДНЕГО ХОДА
+  pinMode(FRONT_LIGHT, OUTPUT);   // Выход для ламп переднего СВЕТА
+  pinMode(LEFT_LIGHT, OUTPUT);    // Выход для ламп ЛЕВЫХ ГАБАРИТОВ
+  pinMode(RIGHT_LIGHT, OUTPUT);   // Выход для ламп ПРАВЫХ ГАБАРИТОВ
+  pinMode(FRONT_GARLAND, OUTPUT); // Выход для ламп ГИРЛЯНДЫ
 }
 // --------------------- ИНИЦИАЛИЗАЦИЯ ----------------------
 
@@ -66,7 +74,8 @@ void alarm()
   if (millis() - tmr > period)
   {
     tmr = millis();
-    digitalWrite(REAR_LIGHT, !digitalRead(REAR_LIGHT));
+    digitalWrite(LEFT_LIGHT, !digitalRead(LEFT_LIGHT));
+    digitalWrite(RIGHT_LIGHT, !digitalRead(RIGHT_LIGHT));
     flag = !flag;
   }
 }
@@ -82,23 +91,29 @@ void calibration()
       throttle_min = ppm_throttle - 25;     // Нижняя граница нейтрали ГАЗА
       throttle_max = ppm_throttle + 25;     // Верхняя граница нейтрали ГАЗА
 
-      ppm_switch = pulseIn(PINCH2, HIGH); // Чтение канала ТУМБЛЕРА
-      switch_min = ppm_switch - 50;       // Нижняя граница нейтрали ТУМБЛЕРА
-      switch_max = ppm_switch + 50;       // Верхняя граница нейтрали ТУМБЛЕРА
+      ppm_switch_light = pulseIn(PINCH2, HIGH); // Чтение канала ТУМБЛЕРние канала gppm_switch_lightА
+      switch_light_min = ppm_switch_light - 50; // Нижняя граница нейтрали ТУМБЛЕРа нейтрали gppm_switch_lightА
+      switch_light_max = ppm_switch_light + 50; // Верхняя граница нейтрали ТУМБЛЕРа нейтрали gppm_switch_lightА
 
-      Serial.print("Газ: ");
-      Serial.print(ppm_throttle);
-      Serial.print(" | Тумблер: ");
-      Serial.println(ppm_switch);
+      ppm_switch_garland = pulseIn(PINCH3, HIGH);
+      switch_garland_min = ppm_switch_garland - 50;
+      switch_garland_max = ppm_switch_garland + 50;
+
+      // Serial.print("Газ: ");
+      // Serial.print(ppm_throttle);
+      // Serial.print(" | Тумблер: ");
+      // Serial.println(ppm_switch_light );
 
       digitalWrite(STOP_LIGHT, 1);
-      digitalWrite(REAR_LIGHT, 1);
+      digitalWrite(LEFT_LIGHT, 1);
+      digitalWrite(RIGHT_LIGHT, 1);
       digitalWrite(REVERS_LIGHT, 1);
       digitalWrite(FRONT_LIGHT, 1);
     }
     // Конец цикла калибровки
     digitalWrite(STOP_LIGHT, 0);
-    digitalWrite(REAR_LIGHT, 0);
+    digitalWrite(LEFT_LIGHT, 0);
+    digitalWrite(RIGHT_LIGHT, 0);
     digitalWrite(REVERS_LIGHT, 0);
     digitalWrite(FRONT_LIGHT, 0);
     calibration_flag = 1;
@@ -129,19 +144,39 @@ void ch1()
   }
 }
 
-// ----- Канал ТУМБЛЕРА -----
+// ----- Канал ТУМБЛЕРА ГАБАРИТОВ и ФАР -----
 void ch2()
 {
-  ppm_switch = pulseIn(PINCH2, HIGH);                     // Чтение канала ТУМБЛЕРА
-  if (ppm_switch < switch_min || ppm_switch > switch_max) // Условие включения СВЕТА и ГАБАРИТОВ
+  ppm_switch_light = pulseIn(PINCH2, HIGH);               // Чтение канала ТУМБЛЕРА
+  if (ppm_switch_light < 1600 && ppm_switch_light > 1400) // Условие включения ГАБАРИТОВ
+  {
+    digitalWrite(LEFT_LIGHT, HIGH);
+    digitalWrite(RIGHT_LIGHT, HIGH);
+    digitalWrite(FRONT_LIGHT, LOW);
+  }
+  else if (ppm_switch_light < 2100 && ppm_switch_light > 1600) // Условие включения ФАР
   {
     digitalWrite(FRONT_LIGHT, HIGH);
-    digitalWrite(REAR_LIGHT, HIGH);
   }
-  else if (ppm_switch > switch_min || ppm_switch < switch_max)
+  else // Условие отключения ФАР и ГАБАРИТОВ
   {
     digitalWrite(FRONT_LIGHT, LOW);
-    digitalWrite(REAR_LIGHT, LOW);
+    digitalWrite(LEFT_LIGHT, LOW);
+    digitalWrite(RIGHT_LIGHT, LOW);
+  }
+}
+
+// ----- Канал ТУМБЛЕРА ГИРЛЯНДЫ -----
+void ch3()
+{
+  ppm_switch_garland = pulseIn(PINCH3, HIGH);                                             // Чтение канала ТУМБЛЕРА ГИРЛЯНДЫ
+  if (ppm_switch_garland < switch_garland_min || ppm_switch_garland > switch_garland_max) // Условие включения ГИРЛЯНДЫ
+  {
+    digitalWrite(FRONT_GARLAND, HIGH);
+  }
+  else
+  {
+    digitalWrite(FRONT_GARLAND, LOW);
   }
 }
 
@@ -154,6 +189,7 @@ void loop()
   }
   calibration(); // Калибровка нейтрали при включении или сбросе
   ch1();         // Чтение канала ГАЗА, управление СТОПОМ и ЗАДНИМ ХОДОМ
-  ch2();         // Чтение канала ТУМБЛЕРА, управление СВЕТОМ
+  ch2();         // Чтение канала ТУМБЛЕРА, управление ГАБАРИТАМИ и ФАРАМИ
+  ch3();         // Чтение канала ТУМБЛЕРА, управление ГИРЛЯНДОЙ
 }
 // ------------------------------ ОСНОВНОЙ ЦИКЛ -------------------------------
